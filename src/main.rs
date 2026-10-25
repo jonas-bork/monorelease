@@ -2,7 +2,7 @@ use clap::Parser;
 use config::{Config, ConfigError, Environment, File};
 use monorelease::{
     config::Config as MonoReleaseConfig,
-    logging::{Log, LogLevel},
+    logging::{Log, LogConfig},
 };
 use tracing::error;
 
@@ -20,13 +20,17 @@ pub fn load_config() -> Result<MonoReleaseConfig, ConfigError> {
 }
 
 fn main() {
-    let log = Log::init(&LogLevel::default());
-
-    let args = cli::Args::parse();
-    let result = Cli::run(args, &log);
+    let result = run();
 
     if let Err(err) = result {
         error!("{err}");
         std::process::exit(1);
     }
+}
+
+fn run() -> Result<()> {
+    let log = Log::init(&LogConfig::default())?;
+
+    let args = cli::Args::parse();
+    Cli::run(args, &log)
 }

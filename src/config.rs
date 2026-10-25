@@ -8,7 +8,7 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use tracing::info;
 
-use crate::logging::LogLevel;
+use crate::logging::LogConfig;
 
 pub const CONFIG_PATH: &str = "monorelease.yaml";
 pub const NEXT_DIR_PATH: &str = "next/";
@@ -17,12 +17,17 @@ pub const PROJECTS_DIR_PATH: &str = "projects/";
 
 pub const DEFAULT_BASE_PATH: &str = "releases/";
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
 pub struct Config {
     #[allow(clippy::struct_field_names, unused)]
     pub config_version: u16,
     pub base_path: PathBuf,
-    pub log_level: LogLevel,
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub log: LogConfig,
+}
+
+pub fn is_default<T: Default + PartialEq>(t: &T) -> bool {
+    *t == T::default()
 }
 
 impl Default for Config {
@@ -30,7 +35,7 @@ impl Default for Config {
         Self {
             config_version: 1,
             base_path: DEFAULT_BASE_PATH.into(),
-            log_level: LogLevel::default(),
+            log: LogConfig::default(),
         }
     }
 }
