@@ -92,7 +92,7 @@ impl Cli {
                 Config::ensure_file_exists_in_dir(&dir);
 
                 let config = Config::load_from_dir(&dir)?;
-                log.set_log_level(&config.log_level);
+                log.apply_config(&config.log);
                 let monorelease = MonoRelease::new(config);
 
                 monorelease.init(&env::current_dir()?)
