@@ -17,7 +17,7 @@ pub const PROJECTS_DIR_PATH: &str = "projects/";
 
 pub const DEFAULT_BASE_PATH: &str = "releases/";
 
-#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
 pub struct Config {
     #[allow(clippy::struct_field_names, unused)]
     pub config_version: u16,

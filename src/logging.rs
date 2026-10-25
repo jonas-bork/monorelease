@@ -20,7 +20,7 @@ pub enum LogLevel {
     Error,
 }
 
-#[derive(Debug, Deserialize, Serialize, Clone, Default, PartialEq)]
+#[derive(Debug, Deserialize, Serialize, Clone, Default, PartialEq, Eq)]
 #[serde(default)]
 pub struct LogConfig {
     level: LogLevel,
@@ -48,7 +48,6 @@ fn make_writer() -> BoxMakeWriter {
 }
 
 impl Log {
-    #[must_use]
     pub fn init(config: &LogConfig) -> Result<Self> {
         let filter = EnvFilter::builder().from_env_lossy();
         let (filter_layer, reload_handle) = reload::Layer::new(filter);
