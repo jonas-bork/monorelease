@@ -65,6 +65,8 @@ mod tests {
                 assert!(base_path.join(&path).exists());
             }
 
+            assert!(false);
+
             Ok(())
         }
     }
