@@ -15,10 +15,15 @@ pub enum Command {
     Version,
     /// Initialise MonoRelease in the current directory.
     Init,
-    /// Change commands.
-    Changes {
-        #[command(subcommand)]
-        command: ChangeCommand,
+    /// Add a change.
+    /// Is interactive by default unless a description is provided.
+    Add {
+        #[arg(value_parser = parse_change_project_input)]
+        projects: Vec<ChangeProjectInput>,
+        #[arg(short, long)]
+        name: Option<String>,
+        #[arg(short, long)]
+        message: Option<String>,
     },
     /// Wave commands.
     Waves,
@@ -34,17 +39,7 @@ pub enum Command {
     },
 }
 
-#[derive(clap::Subcommand, Debug, Clone, PartialEq)]
-pub enum ChangeCommand {
-    Add {
-        name: String,
-        description: String,
-        #[arg(value_parser = parse_change_project_input, num_args=1.., required=true)]
-        projects: Vec<ChangeProjectInput>,
-    },
-}
-
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ChangeProjectInput {
     project_name: String,
     version_bump: String,
@@ -62,7 +57,7 @@ fn parse_change_project_input(s: &str) -> Result<ChangeProjectInput> {
     })
 }
 
-#[derive(clap::Subcommand, Debug, Clone, PartialEq)]
+#[derive(clap::Subcommand, Debug, Clone, PartialEq, Eq)]
 pub enum ProjectCommand {
     Bump {
         project: String,
@@ -128,7 +123,11 @@ impl Cli {
 
                 monorelease.init(&env::current_dir()?)
             }
-            Command::Changes { command } => todo!(),
+            Command::Add {
+                name,
+                message,
+                projects,
+            } => todo!(),
             Command::Waves => todo!(),
             Command::Projects { command } => match command {
                 ProjectCommand::Bump { project, dry } => todo!(),
