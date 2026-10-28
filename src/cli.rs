@@ -1,6 +1,6 @@
 use std::env;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use monorelease::{MonoRelease, config::Config, logging::Log};
 
 #[derive(clap::Parser, Debug, Clone)]
@@ -16,22 +16,53 @@ pub enum Command {
     /// Initialise MonoRelease in the current directory.
     Init,
     /// Change commands.
-    Change,
+    Changes {
+        #[command(subcommand)]
+        command: ChangeCommand,
+    },
     /// Wave commands.
-    Wave,
+    Waves,
     /// Project commands.
-    Project {
+    Projects {
         #[command(subcommand)]
         command: ProjectCommand,
     },
     /// Generate changelogs.
-    Changelog {
+    Changelogs {
         #[command(subcommand)]
         command: ChangelogCommand,
     },
 }
 
-#[derive(clap::Subcommand, Debug, Clone)]
+#[derive(clap::Subcommand, Debug, Clone, PartialEq)]
+pub enum ChangeCommand {
+    Add {
+        name: String,
+        description: String,
+        #[arg(value_parser = parse_change_project_input, num_args=1.., required=true)]
+        projects: Vec<ChangeProjectInput>,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ChangeProjectInput {
+    project_name: String,
+    version_bump: String,
+}
+
+const CHANGE_PROJECT_INPUT_DELIMITER: &str = ":";
+fn parse_change_project_input(s: &str) -> Result<ChangeProjectInput> {
+    let (project_name, version_bump) = s
+        .split_once(CHANGE_PROJECT_INPUT_DELIMITER)
+        .with_context(|| format!("does not contain '{CHANGE_PROJECT_INPUT_DELIMITER}'"))?;
+
+    Ok(ChangeProjectInput {
+        project_name: project_name.to_string(),
+        version_bump: version_bump.to_string(),
+    })
+}
+
+#[derive(clap::Subcommand, Debug, Clone, PartialEq)]
 pub enum ProjectCommand {
     Bump {
         project: String,
@@ -97,13 +128,13 @@ impl Cli {
 
                 monorelease.init(&env::current_dir()?)
             }
-            Command::Change => todo!(),
-            Command::Wave => todo!(),
-            Command::Project { command } => match command {
+            Command::Changes { command } => todo!(),
+            Command::Waves => todo!(),
+            Command::Projects { command } => match command {
                 ProjectCommand::Bump { project, dry } => todo!(),
                 ProjectCommand::Revert { project } => todo!(),
             },
-            Command::Changelog { command } => match command {
+            Command::Changelogs { command } => match command {
                 ChangelogCommand::Exact { project, version } => todo!(),
                 ChangelogCommand::Range { project, from, to } => todo!(),
                 ChangelogCommand::Full { project } => todo!(),
