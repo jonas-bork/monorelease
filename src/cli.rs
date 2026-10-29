@@ -1,7 +1,7 @@
 use std::env;
 
 use anyhow::{Context, Result};
-use monorelease::{MonoRelease, config::Config, logging::Log};
+use monorelease::{MonoRelease, changes::ProjectChange, config::Config, logging::Log};
 
 #[derive(clap::Parser, Debug, Clone)]
 pub struct Args {
@@ -19,7 +19,7 @@ pub enum Command {
     /// Is interactive by default unless a description is provided.
     Add {
         #[arg(value_parser = parse_change_project_input)]
-        projects: Vec<ChangeProjectInput>,
+        projects: Vec<ProjectChange>,
         #[arg(short, long)]
         name: Option<String>,
         #[arg(short, long)]
@@ -39,19 +39,13 @@ pub enum Command {
     },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ChangeProjectInput {
-    project_name: String,
-    version_bump: String,
-}
-
 const CHANGE_PROJECT_INPUT_DELIMITER: &str = ":";
-fn parse_change_project_input(s: &str) -> Result<ChangeProjectInput> {
+fn parse_change_project_input(s: &str) -> Result<ProjectChange> {
     let (project_name, version_bump) = s
         .split_once(CHANGE_PROJECT_INPUT_DELIMITER)
         .with_context(|| format!("does not contain '{CHANGE_PROJECT_INPUT_DELIMITER}'"))?;
 
-    Ok(ChangeProjectInput {
+    Ok(ProjectChange {
         project_name: project_name.to_string(),
         version_bump: version_bump.to_string(),
     })
@@ -127,7 +121,17 @@ impl Cli {
                 name,
                 message,
                 projects,
-            } => todo!(),
+            } => {
+                // TODO: Implement interactive prompts
+
+                const INTERACTIVE_PROMPT_ERROR: &str =
+                    "interactive prompts have not been implemented yet";
+                let name = name.context(INTERACTIVE_PROMPT_ERROR)?;
+                let message = message.context(INTERACTIVE_PROMPT_ERROR)?;
+
+                let monorelease = monorelease_from_config(log)?;
+                monorelease.add(&name, &message, &projects)
+            }
             Command::Waves => todo!(),
             Command::Projects { command } => match command {
                 ProjectCommand::Bump { project, dry } => todo!(),
@@ -140,4 +144,11 @@ impl Cli {
             },
         }
     }
+}
+
+fn monorelease_from_config(log: &Log) -> Result<MonoRelease> {
+    let dir = env::current_dir()?;
+    let config = Config::load_from_dir(&dir)?;
+    log.apply_config(&config.log)?;
+    Ok(MonoRelease::new(config))
 }

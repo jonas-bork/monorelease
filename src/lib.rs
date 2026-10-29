@@ -1,5 +1,6 @@
 use crate::config::Config;
 
+pub mod changes;
 pub mod config;
 pub mod init;
 pub mod logging;
