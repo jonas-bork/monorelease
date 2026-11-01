@@ -1,7 +1,4 @@
-use std::{
-    fs::{self},
-    path::Path,
-};
+use std::fs;
 
 use anyhow::Result;
 use tracing::{debug, info};
@@ -10,7 +7,8 @@ use crate::MonoRelease;
 
 impl MonoRelease {
     /// Initialises the folder structure.
-    pub fn init(&self, dir: &Path) -> Result<()> {
+    pub fn init(&self) -> Result<()> {
+        let dir = &self.root_path;
         info!("initialising at {}", dir.display());
 
         let config = &self.config;
@@ -33,26 +31,19 @@ impl MonoRelease {
 
 #[cfg(test)]
 mod tests {
-    use crate::{config::Config, testing::my_test};
+    use crate::testing::{default_monorelease_env, my_test};
 
     use super::*;
-    use anyhow::{Context, Result};
-    use tempfile::tempdir;
+    use anyhow::Result;
 
     my_test! {
         fn test_init_creates_directories() -> Result<()> {
-            let temp_dir = tempdir().context("Failed to create temp dir")?;
-            let root_path = temp_dir.path().to_path_buf();
-
-            info!("setting up monorelease");
-            Config::ensure_file_exists_in_dir(&root_path)?;
-            let config = Config::load_from_dir(&root_path)?;
-            let monorelease = MonoRelease::new(config);
+            let monorelease = default_monorelease_env()?;
 
             info!("initialising monorelease");
-            monorelease.init(&root_path)?;
+            monorelease.init()?;
 
-            let base_path = root_path.join(crate::config::DEFAULT_BASE_PATH);
+            let base_path = monorelease.root_path.join(crate::config::DEFAULT_BASE_PATH);
 
             let paths_to_check_exists = [
                 crate::config::NEXT_DIR_PATH,

@@ -1,7 +1,7 @@
 use std::env;
 
-use anyhow::Result;
-use monorelease::{MonoRelease, config::Config, logging::Log};
+use anyhow::{Context, Result};
+use monorelease::{MonoRelease, changes::ProjectChange, config::Config, logging::Log};
 
 #[derive(clap::Parser, Debug, Clone)]
 pub struct Args {
@@ -15,23 +15,47 @@ pub enum Command {
     Version,
     /// Initialise MonoRelease in the current directory.
     Init,
-    /// Change commands.
-    Change,
+    /// Add a change interactively.
+    /// If an option is provided via the CLI instead, it will not be prompted interactively.
+    Add {
+        /// The projects that the change affects.
+        #[arg(value_parser = parse_change_project_input)]
+        projects: Vec<ProjectChange>,
+        /// The name of the change.
+        /// This becomes the name of the file created for the change.
+        #[arg(short, long)]
+        name: Option<String>,
+        /// The message describing what has changed.
+        #[arg(short, long)]
+        message: Option<String>,
+    },
     /// Wave commands.
-    Wave,
+    Waves,
     /// Project commands.
-    Project {
+    Projects {
         #[command(subcommand)]
         command: ProjectCommand,
     },
     /// Generate changelogs.
-    Changelog {
+    Changelogs {
         #[command(subcommand)]
         command: ChangelogCommand,
     },
 }
 
-#[derive(clap::Subcommand, Debug, Clone)]
+const CHANGE_PROJECT_INPUT_DELIMITER: &str = ":";
+fn parse_change_project_input(s: &str) -> Result<ProjectChange> {
+    let (project_name, version_bump) = s
+        .split_once(CHANGE_PROJECT_INPUT_DELIMITER)
+        .with_context(|| format!("does not contain '{CHANGE_PROJECT_INPUT_DELIMITER}'"))?;
+
+    Ok(ProjectChange {
+        project_name: project_name.to_string(),
+        version_bump: version_bump.to_string(),
+    })
+}
+
+#[derive(clap::Subcommand, Debug, Clone, PartialEq, Eq)]
 pub enum ProjectCommand {
     Bump {
         project: String,
@@ -93,21 +117,42 @@ impl Cli {
 
                 let config = Config::load_from_dir(&dir)?;
                 log.apply_config(&config.log);
-                let monorelease = MonoRelease::new(config);
+                let monorelease = MonoRelease::new(dir, config);
 
-                monorelease.init(&env::current_dir()?)
+                monorelease.init()
             }
-            Command::Change => todo!(),
-            Command::Wave => todo!(),
-            Command::Project { command } => match command {
+            Command::Add {
+                name,
+                message,
+                projects,
+            } => {
+                // TODO: Implement interactive prompts
+
+                const INTERACTIVE_PROMPT_ERROR: &str =
+                    "interactive prompts have not been implemented yet";
+                let name = name.context(INTERACTIVE_PROMPT_ERROR)?;
+                let message = message.context(INTERACTIVE_PROMPT_ERROR)?;
+
+                let monorelease = monorelease_from_config(log)?;
+                monorelease.add_change(&name, &message, &projects)
+            }
+            Command::Waves => todo!(),
+            Command::Projects { command } => match command {
                 ProjectCommand::Bump { project, dry } => todo!(),
                 ProjectCommand::Revert { project } => todo!(),
             },
-            Command::Changelog { command } => match command {
+            Command::Changelogs { command } => match command {
                 ChangelogCommand::Exact { project, version } => todo!(),
                 ChangelogCommand::Range { project, from, to } => todo!(),
                 ChangelogCommand::Full { project } => todo!(),
             },
         }
     }
+}
+
+fn monorelease_from_config(log: &Log) -> Result<MonoRelease> {
+    let dir = env::current_dir()?;
+    let config = Config::load_from_dir(&dir)?;
+    log.apply_config(&config.log)?;
+    Ok(MonoRelease::new(dir, config))
 }
