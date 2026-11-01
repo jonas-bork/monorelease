@@ -1,7 +1,4 @@
-use std::{
-    fs::{self},
-    path::Path,
-};
+use std::fs;
 
 use anyhow::Result;
 use tracing::{debug, info};
@@ -48,10 +45,10 @@ mod tests {
             info!("setting up monorelease");
             Config::ensure_file_exists_in_dir(&root_path)?;
             let config = Config::load_from_dir(&root_path)?;
-            let monorelease = MonoRelease::new(config);
+            let monorelease = MonoRelease::new(root_path.clone(), config);
 
             info!("initialising monorelease");
-            monorelease.init(&root_path)?;
+            monorelease.init()?;
 
             let base_path = root_path.join(crate::config::DEFAULT_BASE_PATH);
 

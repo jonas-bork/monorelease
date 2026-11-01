@@ -30,7 +30,7 @@ impl MonoRelease {
 fn project_frontmatter(projects: &[ProjectChange]) -> String {
     let mut frontmatter = "---\n".to_string();
     for project_str in projects
-        .into_iter()
+        .iter()
         .map(|project| format!("{}: {}", project.project_name, project.version_bump))
     {
         frontmatter += &project_str;
