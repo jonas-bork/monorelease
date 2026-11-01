@@ -10,7 +10,8 @@ use crate::MonoRelease;
 
 impl MonoRelease {
     /// Initialises the folder structure.
-    pub fn init(&self, dir: &Path) -> Result<()> {
+    pub fn init(&self) -> Result<()> {
+        let dir = &self.root_path;
         info!("initialising at {}", dir.display());
 
         let config = &self.config;

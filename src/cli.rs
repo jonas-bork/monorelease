@@ -113,9 +113,9 @@ impl Cli {
 
                 let config = Config::load_from_dir(&dir)?;
                 log.apply_config(&config.log);
-                let monorelease = MonoRelease::new(config);
+                let monorelease = MonoRelease::new(dir, config);
 
-                monorelease.init(&env::current_dir()?)
+                monorelease.init()
             }
             Command::Add {
                 name,
@@ -150,5 +150,5 @@ fn monorelease_from_config(log: &Log) -> Result<MonoRelease> {
     let dir = env::current_dir()?;
     let config = Config::load_from_dir(&dir)?;
     log.apply_config(&config.log)?;
-    Ok(MonoRelease::new(config))
+    Ok(MonoRelease::new(dir, config))
 }

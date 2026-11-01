@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use crate::config::Config;
 
 pub mod changes;
@@ -9,6 +11,7 @@ pub(crate) mod testing;
 
 #[derive(Debug, Clone)]
 pub struct MonoRelease {
+    root_path: PathBuf,
     config: Config,
 }
 
@@ -16,8 +19,8 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 impl MonoRelease {
     #[must_use]
-    pub const fn new(config: Config) -> Self {
-        Self { config }
+    pub const fn new(root_path: PathBuf, config: Config) -> Self {
+        Self { root_path, config }
     }
 
     #[must_use]
