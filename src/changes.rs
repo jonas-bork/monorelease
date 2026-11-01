@@ -1,8 +1,8 @@
-use std::fs::{self, File};
+use std::fs::{self, OpenOptions};
 use std::io::Write;
 
 use crate::{MonoRelease, config::NEXT_DIR_PATH};
-use anyhow::Result;
+use anyhow::{Context, Result};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProjectChange {
@@ -11,7 +11,7 @@ pub struct ProjectChange {
 }
 
 impl MonoRelease {
-    pub fn add(&self, name: &str, message: &str, projects: &[ProjectChange]) -> Result<()> {
+    pub fn add_change(&self, name: &str, message: &str, projects: &[ProjectChange]) -> Result<()> {
         let dir_path = self
             .root_path
             .join(&self.config.base_path)
@@ -19,7 +19,11 @@ impl MonoRelease {
         fs::create_dir_all(&dir_path)?;
 
         let file_path = dir_path.join(format!("{name}.md"));
-        let mut file = File::create(file_path)?;
+        let mut file = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&file_path)
+            .with_context(|| format!("Change file {name}.md already exists"))?;
 
         let frontmatter = project_frontmatter(projects);
         writeln!(file, "{frontmatter}\n{message}")?;
@@ -63,7 +67,7 @@ mod tests {
                 },
             ];
 
-            monorelease.add("my-feature", "Added new feature functionality", &projects)?;
+            monorelease.add_change("my-feature", "Added new feature functionality", &projects)?;
 
             let file_path = monorelease.root_path
                 .join(&monorelease.config.base_path)
@@ -72,6 +76,45 @@ mod tests {
 
             assert!(file_path.exists());
 
+            let content = fs::read_to_string(&file_path)?;
+            let expected_content = "---\nfrontend: minor\nbackend: patch\n---\nAdded new feature functionality\n";
+
+            assert_eq!(content, expected_content);
+
+            Ok(())
+        }
+    }
+
+    my_test! {
+        fn test_two_changes_with_same_name() -> Result<()> {
+            let monorelease = default_monorelease_env()?;
+
+            let projects = vec![
+                ProjectChange {
+                    project_name: "frontend".to_string(),
+                    version_bump: "minor".to_string(),
+                },
+                ProjectChange {
+                    project_name: "backend".to_string(),
+                    version_bump: "patch".to_string(),
+                },
+            ];
+
+            let file_path = monorelease.root_path
+                .join(&monorelease.config.base_path)
+                .join(crate::config::NEXT_DIR_PATH)
+                .join(format!("{NAME}.md"));
+
+            const NAME: &str = "my-feature";
+            monorelease.add_change(NAME, "Added new feature functionality", &projects)?;
+            assert!(file_path.exists());
+            let err = monorelease.add_change(NAME, "Added new feature", &projects).unwrap_err();
+            assert_eq!(err.to_string(), format!("Change file {NAME}.md already exists"));
+
+
+            assert!(file_path.exists());
+
+            // It should have the first ones content because the second one should not have gone through
             let content = fs::read_to_string(&file_path)?;
             let expected_content = "---\nfrontend: minor\nbackend: patch\n---\nAdded new feature functionality\n";
 

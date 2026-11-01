@@ -15,13 +15,17 @@ pub enum Command {
     Version,
     /// Initialise MonoRelease in the current directory.
     Init,
-    /// Add a change.
-    /// Is interactive by default unless a description is provided.
+    /// Add a change interactively.
+    /// If an option is provided via the CLI instead, it will not be prompted interactively.
     Add {
+        /// The projects that the change affects.
         #[arg(value_parser = parse_change_project_input)]
         projects: Vec<ProjectChange>,
+        /// The name of the change.
+        /// This becomes the name of the file created for the change.
         #[arg(short, long)]
         name: Option<String>,
+        /// The message describing what has changed.
         #[arg(short, long)]
         message: Option<String>,
     },
@@ -130,7 +134,7 @@ impl Cli {
                 let message = message.context(INTERACTIVE_PROMPT_ERROR)?;
 
                 let monorelease = monorelease_from_config(log)?;
-                monorelease.add(&name, &message, &projects)
+                monorelease.add_change(&name, &message, &projects)
             }
             Command::Waves => todo!(),
             Command::Projects { command } => match command {
