@@ -8,19 +8,19 @@ use crate::MonoRelease;
 impl MonoRelease {
     /// Initialises the folder structure.
     pub fn init(&self) -> Result<()> {
-        let dir = &self.root_path;
+        let dir = &self.root_dir;
         info!("initialising at {}", dir.display());
 
         let config = &self.config;
 
-        fs::create_dir_all(config.base_path.clone())?;
+        fs::create_dir_all(config.releases_dir.clone())?;
         let dirs_to_create = [
             crate::config::NEXT_DIR_PATH,
             crate::config::PROJECTS_DIR_PATH,
-            crate::config::WAVE_DIR_PATH,
+            crate::config::WAVES_DIR_PATH,
         ];
         for dir_path in dirs_to_create {
-            let path = dir.join(&config.base_path).join(dir_path);
+            let path = dir.join(&config.releases_dir).join(dir_path);
             debug!("Creating {}", path.display());
             fs::create_dir_all(path)?;
         }
@@ -43,12 +43,12 @@ mod tests {
             info!("initialising monorelease");
             monorelease.init()?;
 
-            let base_path = monorelease.root_path.join(crate::config::DEFAULT_BASE_PATH);
+            let base_path = monorelease.root_dir.join(crate::config::DEFAULT_BASE_PATH);
 
             let paths_to_check_exists = [
                 crate::config::NEXT_DIR_PATH,
                 crate::config::PROJECTS_DIR_PATH,
-                crate::config::WAVE_DIR_PATH,
+                crate::config::WAVES_DIR_PATH,
             ];
 
             for path in paths_to_check_exists {

@@ -30,7 +30,10 @@ pub enum Command {
         message: Option<String>,
     },
     /// Wave commands.
-    Waves,
+    Waves {
+        #[command(subcommand)]
+        command: WaveCommand,
+    },
     /// Project commands.
     Projects {
         #[command(subcommand)]
@@ -41,6 +44,11 @@ pub enum Command {
         #[command(subcommand)]
         command: ChangelogCommand,
     },
+}
+
+#[derive(clap::Subcommand, Debug, Clone, PartialEq, Eq)]
+pub enum WaveCommand {
+    Create,
 }
 
 const CHANGE_PROJECT_INPUT_DELIMITER: &str = ":";
@@ -136,7 +144,12 @@ impl Cli {
                 let monorelease = monorelease_from_config(log)?;
                 monorelease.add_change(&name, &message, &projects)
             }
-            Command::Waves => todo!(),
+            Command::Waves { command } => match command {
+                WaveCommand::Create => {
+                    let monorelease = monorelease_from_config(log)?;
+                    monorelease.create_wave()
+                }
+            },
             Command::Projects { command } => match command {
                 ProjectCommand::Bump { project, dry } => todo!(),
                 ProjectCommand::Revert { project } => todo!(),

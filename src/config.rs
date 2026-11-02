@@ -10,9 +10,9 @@ use tracing::info;
 
 use crate::logging::LogConfig;
 
-pub const CONFIG_PATH: &str = "monorelease.yaml";
+pub const CONFIG_FILE_PATH: &str = "monorelease.yaml";
 pub const NEXT_DIR_PATH: &str = "next/";
-pub const WAVE_DIR_PATH: &str = "waves/";
+pub const WAVES_DIR_PATH: &str = "waves/";
 pub const PROJECTS_DIR_PATH: &str = "projects/";
 
 pub const DEFAULT_BASE_PATH: &str = "releases/";
@@ -21,7 +21,8 @@ pub const DEFAULT_BASE_PATH: &str = "releases/";
 pub struct Config {
     #[allow(clippy::struct_field_names, unused)]
     pub config_version: u16,
-    pub base_path: PathBuf,
+    /// The path to the releases directory.
+    pub releases_dir: PathBuf,
     #[serde(default, skip_serializing_if = "is_default")]
     pub log: LogConfig,
 }
@@ -34,7 +35,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             config_version: 1,
-            base_path: DEFAULT_BASE_PATH.into(),
+            releases_dir: DEFAULT_BASE_PATH.into(),
             log: LogConfig::default(),
         }
     }
@@ -48,11 +49,11 @@ impl Config {
     }
 
     pub fn load_from_dir(dir: &Path) -> Result<Self> {
-        Self::load_from_file(&dir.join(CONFIG_PATH))
+        Self::load_from_file(&dir.join(CONFIG_FILE_PATH))
     }
 
     pub fn ensure_file_exists_in_dir(dir: &Path) -> Result<()> {
-        let config_path = dir.join(CONFIG_PATH);
+        let config_path = dir.join(CONFIG_FILE_PATH);
         if config_path.exists() {
             info!("existing config file detected at {}", config_path.display());
         } else {
