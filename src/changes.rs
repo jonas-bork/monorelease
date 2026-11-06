@@ -12,10 +12,7 @@ pub struct ProjectChange {
 
 impl MonoRelease {
     pub fn add_change(&self, name: &str, message: &str, projects: &[ProjectChange]) -> Result<()> {
-        let dir_path = self
-            .root_path
-            .join(&self.config.base_path)
-            .join(NEXT_DIR_PATH);
+        let dir_path = self.releases_dir.join(NEXT_DIR_PATH);
         fs::create_dir_all(&dir_path)?;
 
         let file_path = dir_path.join(format!("{name}.md"));
@@ -69,8 +66,8 @@ mod tests {
 
             monorelease.add_change("my-feature", "Added new feature functionality", &projects)?;
 
-            let file_path = monorelease.root_path
-                .join(&monorelease.config.base_path)
+            let file_path = monorelease.root_dir
+                .join(&monorelease.config.releases_dir)
                 .join(crate::config::NEXT_DIR_PATH)
                 .join("my-feature.md");
 
@@ -100,8 +97,8 @@ mod tests {
                 },
             ];
 
-            let file_path = monorelease.root_path
-                .join(&monorelease.config.base_path)
+            let file_path = monorelease.root_dir
+                .join(&monorelease.config.releases_dir)
                 .join(crate::config::NEXT_DIR_PATH)
                 .join(format!("{NAME}.md"));
 
