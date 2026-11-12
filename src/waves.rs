@@ -7,18 +7,19 @@ use crate::{
 use anyhow::{Context, Result};
 use tracing::warn;
 
-type Wave = u32;
+pub type Wave = u32;
 
 impl MonoRelease {
     pub fn create_wave(&self) -> Result<()> {
-        let current_wave = self.find_current_wave();
-        let next_wave = calculate_next_wave(current_wave)?;
-        let next_wave_dir = self.create_wave_dir(next_wave)?;
-        let next_dir = self.next_changes_dir();
-        if std::fs::read_dir(&next_dir)?.next().is_none() {
+        if self.next_changes_dir_is_empty()? {
             warn!("creating a wave with no changes");
         }
-        move_changes(&next_dir, &next_wave_dir)
+
+        let current_wave = self.find_current_wave()?;
+        let next_wave = calculate_next_wave(current_wave)?;
+        let next_wave_dir = self.create_wave_dir(next_wave)?;
+
+        move_changes(&self.next_changes_dir(), &next_wave_dir)
     }
 
     #[must_use]
@@ -26,18 +27,24 @@ impl MonoRelease {
         self.releases_dir.join(WAVES_DIR_PATH)
     }
 
-    fn find_current_wave(&self) -> Wave {
+    pub fn find_current_wave(&self) -> Result<Wave> {
         let waves_dir = self.waves_dir();
-        let Ok(entries) = std::fs::read_dir(&waves_dir) else {
-            return 0;
-        };
-        entries
-            .filter_map(|entry| {
-                let name = entry.ok()?.file_name();
-                name.to_str()?.parse::<Wave>().ok()
-            })
-            .max()
-            .unwrap_or(0)
+        let entries = std::fs::read_dir(&waves_dir)
+            .with_context(|| format!("failed to read waves directory '{}'", waves_dir.display()))?;
+        let mut max_wave: Option<Wave> = None;
+        for entry in entries {
+            let entry = entry.with_context(|| {
+                format!(
+                    "failed to read entry in waves directory '{}'",
+                    waves_dir.display()
+                )
+            })?;
+            let file_name = entry.file_name();
+            if let Some(wave) = file_name.to_str().and_then(|s| s.parse::<Wave>().ok()) {
+                max_wave = Some(max_wave.map_or(wave, |m: Wave| m.max(wave)));
+            }
+        }
+        Ok(max_wave.unwrap_or(0))
     }
 
     fn create_wave_dir(&self, wave: Wave) -> Result<PathBuf> {
@@ -49,6 +56,11 @@ impl MonoRelease {
 
     fn next_changes_dir(&self) -> PathBuf {
         self.releases_dir.join(NEXT_DIR_PATH)
+    }
+
+    pub fn next_changes_dir_is_empty(&self) -> Result<bool> {
+        let next_dir = self.next_changes_dir();
+        Ok(std::fs::read_dir(&next_dir)?.next().is_none())
     }
 }
 

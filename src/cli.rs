@@ -65,15 +65,7 @@ fn parse_change_project_input(s: &str) -> Result<ProjectChange> {
 
 #[derive(clap::Subcommand, Debug, Clone, PartialEq, Eq)]
 pub enum ProjectCommand {
-    Bump {
-        project: String,
-
-        /// Performs a dry-run.
-        #[arg(long)]
-        dry: bool,
-    },
-    /// Revert the last bump of a project.
-    Revert { project: String },
+    Bump { project: String },
 }
 
 pub type Wave = u32;
@@ -151,8 +143,7 @@ impl Cli {
                 }
             },
             Command::Projects { command } => match command {
-                ProjectCommand::Bump { project, dry } => todo!(),
-                ProjectCommand::Revert { project } => todo!(),
+                ProjectCommand::Bump { project } => todo!(),
             },
             Command::Changelogs { command } => match command {
                 ChangelogCommand::Exact { project, version } => todo!(),
