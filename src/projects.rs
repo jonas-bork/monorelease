@@ -25,6 +25,7 @@ pub struct Project {
     pub config_path: PathBuf,
     pub config: ProjectConfig,
 }
+
 impl Project {
     /// Returns the wave of the current release of the project.
     /// Returns 0 if there are no releases.
@@ -32,6 +33,7 @@ impl Project {
         todo!()
     }
 
+    /// Saves the current configuration to the config path
     fn save_config(&self) -> Result<()> {
         todo!()
     }
@@ -77,6 +79,9 @@ impl MonoRelease {
 
     fn get_project_from_config_file(&self, project_id: String) -> Result<Project> {
         // Hint: find the relevant project file from the dir with path config::PROJECTS_DIR_PATH
+        //       It should then read the contents of the project's config file into a `ProjectConfig` struct.
+        //       This `ProjectConfig` struct should then be placed in a `Project` struct.
+        // Note: The ID of the `Project` struct is the name of the file (without the .yml or .yaml at the end).
         todo!()
     }
 
