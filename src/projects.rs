@@ -439,6 +439,96 @@ mod tests {
         }
     }
 
+    // --- ProjectId ---
+
+    #[test]
+    fn test_project_id_accepts_valid_ids() {
+        for id in ["frontend", "api_client", "open-game-rules", "A1", "0", "a"] {
+            let project_id = ProjectId::new(id).unwrap();
+            assert_eq!(project_id.as_str(), id);
+            assert_eq!(project_id.to_string(), id);
+        }
+    }
+
+    #[test]
+    fn test_project_id_accepts_owned_string() {
+        let project_id = ProjectId::new("frontend".to_string()).unwrap();
+        assert_eq!(project_id.as_str(), "frontend");
+    }
+
+    #[test]
+    fn test_project_id_rejects_empty() {
+        let err = ProjectId::new("").unwrap_err();
+        assert!(err.to_string().contains("project ID must not be empty"));
+    }
+
+    #[test]
+    fn test_project_id_rejects_path_traversal() {
+        for id in ["..", "../evil", "../../etc/passwd", "a/b", "a\\b"] {
+            let err = ProjectId::new(id).unwrap_err();
+            assert!(
+                err.to_string().contains("invalid project ID"),
+                "expected invalid project ID for {id:?}, got: {err}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_project_id_from_str() {
+        let project_id: ProjectId = "frontend".parse().unwrap();
+        assert_eq!(project_id.as_str(), "frontend");
+        assert!("../evil".parse::<ProjectId>().is_err());
+    }
+
+    #[test]
+    fn test_project_id_borrow_lookup() {
+        let mut map = HashMap::new();
+        map.insert(ProjectId::new("frontend").unwrap(), 1);
+        assert_eq!(map.get("frontend"), Some(&1));
+    }
+
+    #[test]
+    fn test_project_id_serde_round_trip() -> Result<()> {
+        let project_id = ProjectId::new("frontend")?;
+        let yaml = serde_yaml::to_string(&project_id)?;
+        assert_eq!(serde_yaml::from_str::<String>(&yaml)?, "frontend");
+
+        let deserialized: ProjectId = serde_yaml::from_str("frontend")?;
+        assert_eq!(deserialized, project_id);
+
+        let err = serde_yaml::from_str::<ProjectId>("''").unwrap_err();
+        assert!(err.to_string().contains("project ID must not be empty"));
+
+        let err = serde_yaml::from_str::<ProjectId>("'../evil'").unwrap_err();
+        assert!(err.to_string().contains("invalid project ID"));
+        Ok(())
+    }
+
+    #[test]
+    fn test_project_id_serde_map_key_round_trip() -> Result<()> {
+        let mut dependencies = HashMap::new();
+        dependencies.insert(ProjectId::new("frontend")?, "patch".to_string());
+
+        let yaml = serde_yaml::to_string(&dependencies)?;
+        let round_trip: HashMap<ProjectId, String> = serde_yaml::from_str(&yaml)?;
+
+        assert_eq!(round_trip, dependencies);
+        Ok(())
+    }
+
+    #[test]
+    fn test_project_id_serde_rejects_invalid_map_key() {
+        let err =
+            serde_yaml::from_str::<HashMap<ProjectId, String>>("'../evil': patch").unwrap_err();
+        assert!(err.to_string().contains("invalid project ID"));
+    }
+
+    #[test]
+    fn test_project_id_rejects_traversal_in_change_frontmatter() {
+        let err = parse_change_frontmatter("---\n../evil: minor\n---\nbody").unwrap_err();
+        assert!(format!("{err:#}").contains("invalid project ID"));
+    }
+
     my_test! {
         fn test_get_project_from_config_file_reads_yaml() -> Result<()> {
             let monorelease = default_monorelease_env()?;
