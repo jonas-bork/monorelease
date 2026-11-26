@@ -80,25 +80,14 @@ impl<'de> Deserialize<'de> for ProjectId {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-enum VersionBump {
-    Patch,
-    Minor,
-    Major,
+struct Version {
+    major: u64,
+    minor: u64,
+    patch: u64,
 }
 
-impl VersionBump {
-    fn from_magnitude(magnitude: &str) -> Result<Self> {
-        match magnitude {
-            "patch" => Ok(Self::Patch),
-            "minor" => Ok(Self::Minor),
-            "major" => Ok(Self::Major),
-            other => bail!(
-                "unknown version bump '{other}'; expected one of 'patch', 'minor', or 'major'"
-            ),
-        }
-    }
-
-    fn apply(self, version: &str) -> Result<String> {
+impl Version {
+    fn parse(version: &str) -> Result<Self> {
         let mut components = version.split('.');
         let major: u64 = components
             .next()
@@ -119,10 +108,45 @@ impl VersionBump {
             bail!("invalid version '{version}': expected 'major.minor.patch'");
         }
 
+        Ok(Self {
+            major,
+            minor,
+            patch,
+        })
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum VersionBump {
+    Patch,
+    Minor,
+    Major,
+}
+
+impl VersionBump {
+    fn from_magnitude(magnitude: &str) -> Result<Self> {
+        match magnitude {
+            "patch" => Ok(Self::Patch),
+            "minor" => Ok(Self::Minor),
+            "major" => Ok(Self::Major),
+            other => bail!(
+                "unknown version bump '{other}'; expected one of 'patch', 'minor', or 'major'"
+            ),
+        }
+    }
+
+    fn apply(self, version: &str) -> Result<String> {
+        let version = Version::parse(version)?;
+
         let next = match self {
-            Self::Major => format!("{}.0.0", increment(major, "major")?),
-            Self::Minor => format!("{}.{}.0", major, increment(minor, "minor")?),
-            Self::Patch => format!("{}.{}.{}", major, minor, increment(patch, "patch")?),
+            Self::Major => format!("{}.0.0", increment(version.major, "major")?),
+            Self::Minor => format!("{}.{}.0", version.major, increment(version.minor, "minor")?),
+            Self::Patch => format!(
+                "{}.{}.{}",
+                version.major,
+                version.minor,
+                increment(version.patch, "patch")?
+            ),
         };
         Ok(next)
     }
@@ -177,12 +201,26 @@ impl Project {
 
     /// Returns the version of the current release of the project.
     /// Returns `None` if there are no releases.
-    fn current_version(&self) -> Option<&str> {
-        self.config
-            .releases
-            .iter()
-            .max_by(|left, right| left.1.cmp(right.1))
-            .map(|(version, _)| version.as_str())
+    fn current_version(&self) -> Result<Option<&str>> {
+        let mut current: Option<(Version, &str)> = None;
+
+        for version in self.config.releases.keys() {
+            let parsed = Version::parse(version)
+                .with_context(|| format!("invalid version '{version}' in project '{}'", self.id))?;
+
+            match current {
+                Some((best, _)) if parsed < best => {}
+                Some((best, best_version)) if parsed == best => {
+                    bail!(
+                        "project '{}' has semantically equal versions '{best_version}' and '{version}'",
+                        self.id
+                    );
+                }
+                _ => current = Some((parsed, version.as_str())),
+            }
+        }
+
+        Ok(current.map(|(_, version)| version))
     }
 
     /// Saves the current configuration to the config path
@@ -337,7 +375,7 @@ impl MonoRelease {
         let mut versions = HashMap::new();
         for (project_id, bump) in bumps {
             let project = self.get_project_from_config_file(&project_id)?;
-            let current_version = project.current_version().unwrap_or("0.0.0");
+            let current_version = project.current_version()?.unwrap_or("0.0.0");
             versions.insert(project_id, bump.apply(current_version)?);
         }
 
@@ -829,12 +867,39 @@ mod tests {
     // --- Project::current_version ---
 
     #[test]
-    fn test_current_version_uses_latest_wave() {
-        assert_eq!(sample_project(&[]).current_version(), None);
+    fn test_current_version_uses_highest_semantic_version() -> Result<()> {
+        assert_eq!(sample_project(&[]).current_version()?, None);
         assert_eq!(
-            sample_project(&[("10.0.0", 1), ("2.0.0", 2)]).current_version(),
-            Some("2.0.0")
+            sample_project(&[("10.0.0", 1), ("2.0.0", 2)]).current_version()?,
+            Some("10.0.0")
         );
+        assert_eq!(
+            sample_project(&[("1.9.0", 1), ("1.10.0", 2)]).current_version()?,
+            Some("1.10.0")
+        );
+        assert_eq!(
+            sample_project(&[("1.2.9", 1), ("1.2.10", 2)]).current_version()?,
+            Some("1.2.10")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_current_version_rejects_invalid_version() {
+        let err = sample_project(&[("not-a-version", 1)])
+            .current_version()
+            .unwrap_err();
+        let message = format!("{err:#}");
+        assert!(message.contains("not-a-version"));
+        assert!(message.contains("sample"));
+    }
+
+    #[test]
+    fn test_current_version_rejects_semantic_ties() {
+        let err = sample_project(&[("1.0.0", 1), ("01.0.0", 2)])
+            .current_version()
+            .unwrap_err();
+        assert!(err.to_string().contains("semantically equal versions"));
     }
 
     // --- Project::save_config ---
@@ -1100,16 +1165,17 @@ mod tests {
     }
 
     my_test! {
-        fn test_bump_project_rejects_version_collision() -> Result<()> {
+        fn test_bump_project_uses_highest_semantic_version() -> Result<()> {
             let monorelease = setup_env()?;
-            write_project(&monorelease, "frontend", &[("0.1.0", 1), ("0.2.0", 0)]);
-            write_change_file(&monorelease, 2, "change", &[("frontend", "minor")]);
+            write_project(&monorelease, "frontend", &[("2.0.0", 0), ("1.0.0", 1)]);
+            write_change_file(&monorelease, 2, "change", &[("frontend", "patch")]);
 
-            let err = monorelease
-                .bump_project(&project_id("frontend"))
-                .unwrap_err();
+            monorelease.bump_project(&project_id("frontend"))?;
 
-            assert!(err.to_string().contains("version already exists for project"));
+            let project = monorelease.get_project_from_config_file(&project_id("frontend"))?;
+            assert_eq!(project.config.releases.get("2.0.0"), Some(&0));
+            assert_eq!(project.config.releases.get("1.0.0"), Some(&1));
+            assert_eq!(project.config.releases.get("2.0.1"), Some(&2));
             Ok(())
         }
     }
