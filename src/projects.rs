@@ -1,14 +1,83 @@
 use anyhow::{Context, Result, bail};
 use std::{
+    borrow::Borrow,
     collections::{HashMap, hash_map::Entry},
+    fmt,
     path::PathBuf,
+    str::FromStr,
 };
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::{MonoRelease, config::PROJECTS_DIR_PATH, waves::Wave};
 
 pub type ProjectName = String;
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
+#[serde(transparent)]
+pub struct ProjectId(String);
+
+impl ProjectId {
+    /// Creates a new project ID.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the ID is empty or contains characters outside
+    /// `[A-Za-z0-9_-]`.
+    pub fn new(id: impl Into<String>) -> Result<Self> {
+        let id = id.into();
+
+        if id.is_empty() {
+            bail!("project ID must not be empty");
+        }
+
+        if !id.chars().all(|character| {
+            character.is_ascii_alphanumeric() || character == '_' || character == '-'
+        }) {
+            bail!("invalid project ID '{id}': expected only ASCII letters, digits, '_', and '-'");
+        }
+
+        Ok(Self(id))
+    }
+
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl fmt::Display for ProjectId {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
+impl AsRef<str> for ProjectId {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl Borrow<str> for ProjectId {
+    fn borrow(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl FromStr for ProjectId {
+    type Err = anyhow::Error;
+
+    fn from_str(id: &str) -> Result<Self> {
+        Self::new(id)
+    }
+}
+
+impl<'de> Deserialize<'de> for ProjectId {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let id = String::deserialize(deserializer)?;
+        Self::new(id).map_err(serde::de::Error::custom)
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 enum VersionBump {

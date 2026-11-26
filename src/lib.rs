@@ -11,6 +11,8 @@ pub mod projects;
 pub(crate) mod testing;
 pub mod waves;
 
+pub use projects::ProjectId;
+
 #[derive(Debug, Clone)]
 pub struct MonoRelease {
     root_dir: PathBuf,
