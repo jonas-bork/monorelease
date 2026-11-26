@@ -100,6 +100,7 @@ fn move_changes(from: &Path, to: &Path) -> Result<()> {
 mod tests {
     use super::*;
     use crate::{
+        ProjectId,
         changes::ProjectChange,
         testing::{default_monorelease_env, my_test},
     };
@@ -141,7 +142,7 @@ mod tests {
             monorelease.init()?;
 
             let projects = vec![ProjectChange {
-                project_name: "frontend".to_string(),
+                project_id: ProjectId::new("frontend")?,
                 version_bump: "minor".to_string(),
             }];
             monorelease.add_change("my-change", "A change", &projects)?;
@@ -159,7 +160,7 @@ mod tests {
             monorelease.init()?;
 
             let projects = vec![ProjectChange {
-                project_name: "frontend".to_string(),
+                project_id: ProjectId::new("frontend")?,
                 version_bump: "minor".to_string(),
             }];
             monorelease.add_change("my-change", "A change", &projects)?;

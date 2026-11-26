@@ -134,7 +134,7 @@ fn increment(component: u64, name: &str) -> Result<u64> {
         .with_context(|| format!("{name} version component overflowed"))
 }
 
-fn parse_change_frontmatter(contents: &str) -> Result<HashMap<ProjectName, String>> {
+fn parse_change_frontmatter(contents: &str) -> Result<HashMap<ProjectId, String>> {
     let after_opening = contents
         .strip_prefix("---")
         .context("change file is missing its YAML frontmatter")?;
@@ -147,7 +147,7 @@ fn parse_change_frontmatter(contents: &str) -> Result<HashMap<ProjectName, Strin
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
 pub struct ProjectConfig {
     pub name: ProjectName,
-    pub dependencies: HashMap<ProjectName, DependencyConfig>,
+    pub dependencies: HashMap<ProjectId, DependencyConfig>,
     pub releases: HashMap<String, Wave>,
 }
 
@@ -158,7 +158,7 @@ pub struct DependencyConfig {
 
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
 pub struct Project {
-    pub id: String,
+    pub id: ProjectId,
     pub config_path: PathBuf,
     pub config: ProjectConfig,
 }
@@ -204,7 +204,7 @@ impl Project {
 }
 
 impl MonoRelease {
-    pub fn bump_project(&self, project_id: String) -> Result<()> {
+    pub fn bump_project(&self, project_id: &ProjectId) -> Result<()> {
         if !self.next_changes_dir_is_empty()? {
             bail!(
                 "bumping project when changes are pending. If MonoRelease is used correctly, then these change files represent changes already applied in the files. Therefore, bumping the release inside MonoRelease without these pending change files in a wave, the actual release will include the changes, but the changelog and state of MonoRelease will not"
@@ -244,7 +244,7 @@ impl MonoRelease {
         Ok(())
     }
 
-    fn get_project_from_config_file(&self, project_id: String) -> Result<Project> {
+    fn get_project_from_config_file(&self, project_id: &ProjectId) -> Result<Project> {
         let projects_dir = self.releases_dir.join(PROJECTS_DIR_PATH);
         let yaml_path = projects_dir.join(format!("{project_id}.yaml"));
         let yml_path = projects_dir.join(format!("{project_id}.yml"));
@@ -271,7 +271,7 @@ impl MonoRelease {
         })?;
 
         Ok(Project {
-            id: project_id,
+            id: project_id.clone(),
             config_path,
             config,
         })
@@ -283,8 +283,8 @@ impl MonoRelease {
         &self,
         last_release_wave: u32,
         current_release_wave: u32,
-    ) -> Result<HashMap<ProjectName, String>> {
-        let mut bumps: HashMap<ProjectName, VersionBump> = HashMap::new();
+    ) -> Result<HashMap<ProjectId, String>> {
+        let mut bumps: HashMap<ProjectId, VersionBump> = HashMap::new();
         let first_wave = last_release_wave
             .checked_add(1)
             .context("wave number overflowed")?;
@@ -336,7 +336,7 @@ impl MonoRelease {
 
         let mut versions = HashMap::new();
         for (project_id, bump) in bumps {
-            let project = self.get_project_from_config_file(project_id.clone())?;
+            let project = self.get_project_from_config_file(&project_id)?;
             let current_version = project.current_version().unwrap_or("0.0.0");
             versions.insert(project_id, bump.apply(current_version)?);
         }
@@ -420,9 +420,13 @@ mod tests {
         Ok(monorelease)
     }
 
+    fn project_id(id: &str) -> ProjectId {
+        ProjectId::new(id).unwrap()
+    }
+
     fn sample_project(releases: &[(&str, Wave)]) -> Project {
         Project {
-            id: "sample".to_string(),
+            id: project_id("sample"),
             config_path: PathBuf::from("sample.yaml"),
             config: ProjectConfig {
                 name: "sample".to_string(),
@@ -440,9 +444,9 @@ mod tests {
             let monorelease = default_monorelease_env()?;
             write_project(&monorelease, "frontend", &[]);
 
-            let project = monorelease.get_project_from_config_file("frontend".to_string())?;
+            let project = monorelease.get_project_from_config_file(&project_id("frontend"))?;
 
-            assert_eq!(project.id, "frontend");
+            assert_eq!(project.id.as_str(), "frontend");
             assert_eq!(
                 project.config_path,
                 projects_dir(&monorelease).join("frontend.yaml")
@@ -462,9 +466,9 @@ mod tests {
                 &project_yaml("frontend", &[]),
             );
 
-            let project = monorelease.get_project_from_config_file("frontend".to_string())?;
+            let project = monorelease.get_project_from_config_file(&project_id("frontend"))?;
 
-            assert_eq!(project.id, "frontend");
+            assert_eq!(project.id.as_str(), "frontend");
             assert_eq!(
                 project.config_path,
                 projects_dir(&monorelease).join("frontend.yml")
@@ -486,7 +490,7 @@ mod tests {
             );
 
             let err = monorelease
-                .get_project_from_config_file("frontend".to_string())
+                .get_project_from_config_file(&project_id("frontend"))
                 .unwrap_err();
 
             let message = err.to_string();
@@ -502,7 +506,7 @@ mod tests {
             let monorelease = default_monorelease_env()?;
 
             let err = monorelease
-                .get_project_from_config_file("frontend".to_string())
+                .get_project_from_config_file(&project_id("frontend"))
                 .unwrap_err();
 
             assert_eq!(
@@ -522,7 +526,7 @@ mod tests {
             write_config(&monorelease, "frontend", "yaml", "name: [unterminated\n");
 
             let err = monorelease
-                .get_project_from_config_file("frontend".to_string())
+                .get_project_from_config_file(&project_id("frontend"))
                 .unwrap_err();
 
             assert!(err.to_string().contains("failed to parse project config"));
@@ -541,7 +545,7 @@ mod tests {
             );
 
             let err = monorelease
-                .get_project_from_config_file("frontend".to_string())
+                .get_project_from_config_file(&project_id("frontend"))
                 .unwrap_err();
 
             assert!(err.to_string().contains("failed to parse project config"));
@@ -555,7 +559,7 @@ mod tests {
             write_config(&monorelease, "frontend", "yaml", "");
 
             let err = monorelease
-                .get_project_from_config_file("frontend".to_string())
+                .get_project_from_config_file(&project_id("frontend"))
                 .unwrap_err();
 
             assert!(err.to_string().contains("failed to parse project config"));
@@ -573,7 +577,7 @@ mod tests {
                 "name: frontend\ndependencies: {}\nreleases: {}\nextra: 1\n",
             );
 
-            let project = monorelease.get_project_from_config_file("frontend".to_string())?;
+            let project = monorelease.get_project_from_config_file(&project_id("frontend"))?;
 
             assert_eq!(project.config.name, "frontend");
             Ok(())
@@ -758,7 +762,7 @@ mod tests {
             project.config.releases.insert("2.0.0".to_string(), 2);
             project.save_config()?;
 
-            let reloaded = monorelease.get_project_from_config_file("sample".to_string())?;
+            let reloaded = monorelease.get_project_from_config_file(&project_id("sample"))?;
             assert_eq!(reloaded.config, project.config);
             Ok(())
         }
@@ -907,9 +911,9 @@ mod tests {
             write_project(&monorelease, "frontend", &[]);
             write_change_file(&monorelease, 1, "change", &[("frontend", "minor")]);
 
-            monorelease.bump_project("frontend".to_string())?;
+            monorelease.bump_project(&project_id("frontend"))?;
 
-            let project = monorelease.get_project_from_config_file("frontend".to_string())?;
+            let project = monorelease.get_project_from_config_file(&project_id("frontend"))?;
             assert_eq!(project.config.releases.get("0.1.0"), Some(&1));
             Ok(())
         }
@@ -921,9 +925,9 @@ mod tests {
             write_project(&monorelease, "frontend", &[("1.2.3", 1)]);
             write_change_file(&monorelease, 2, "change", &[("frontend", "patch")]);
 
-            monorelease.bump_project("frontend".to_string())?;
+            monorelease.bump_project(&project_id("frontend"))?;
 
-            let project = monorelease.get_project_from_config_file("frontend".to_string())?;
+            let project = monorelease.get_project_from_config_file(&project_id("frontend"))?;
             assert_eq!(project.config.releases.get("1.2.3"), Some(&1));
             assert_eq!(project.config.releases.get("1.2.4"), Some(&2));
             Ok(())
@@ -939,7 +943,7 @@ mod tests {
             fs::write(next_dir.join("pending.md"), "pending")?;
 
             let err = monorelease
-                .bump_project("frontend".to_string())
+                .bump_project(&project_id("frontend"))
                 .unwrap_err();
 
             assert!(
@@ -955,7 +959,7 @@ mod tests {
             let monorelease = setup_env()?;
             write_project(&monorelease, "frontend", &[]);
             let err = monorelease
-                .bump_project("frontend".to_string())
+                .bump_project(&project_id("frontend"))
                 .unwrap_err();
             assert!(
                 err.to_string()
@@ -965,7 +969,7 @@ mod tests {
             let monorelease = setup_env()?;
             write_project(&monorelease, "frontend", &[("1.0.0", 5)]);
             let err = monorelease
-                .bump_project("frontend".to_string())
+                .bump_project(&project_id("frontend"))
                 .unwrap_err();
             assert!(
                 err.to_string()
@@ -982,7 +986,7 @@ mod tests {
             write_project(&monorelease, "backend", &[]);
             write_change_file(&monorelease, 1, "change", &[("backend", "minor")]);
             let err = monorelease
-                .bump_project("frontend".to_string())
+                .bump_project(&project_id("frontend"))
                 .unwrap_err();
             assert!(err.to_string().contains("no change files targeting the project"));
 
@@ -995,7 +999,7 @@ mod tests {
                 &[("frontend", "minor"), ("ghost", "patch")],
             );
             let err = monorelease
-                .bump_project("frontend".to_string())
+                .bump_project(&project_id("frontend"))
                 .unwrap_err();
             assert!(
                 err.to_string()
@@ -1012,7 +1016,7 @@ mod tests {
             write_change_file(&monorelease, 2, "change", &[("frontend", "minor")]);
 
             let err = monorelease
-                .bump_project("frontend".to_string())
+                .bump_project(&project_id("frontend"))
                 .unwrap_err();
 
             assert!(err.to_string().contains("version already exists for project"));
