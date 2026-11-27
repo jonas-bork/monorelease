@@ -1,12 +1,12 @@
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 
-use crate::{MonoRelease, config::NEXT_DIR_PATH};
+use crate::{MonoRelease, ProjectId, config::NEXT_DIR_PATH};
 use anyhow::{Context, Result};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProjectChange {
-    pub project_name: String,
+    pub project_id: ProjectId,
     pub version_bump: String,
 }
 
@@ -32,7 +32,7 @@ fn project_frontmatter(projects: &[ProjectChange]) -> String {
     let mut frontmatter = "---\n".to_string();
     for project_str in projects
         .iter()
-        .map(|project| format!("{}: {}", project.project_name, project.version_bump))
+        .map(|project| format!("{}: {}", project.project_id, project.version_bump))
     {
         frontmatter += &project_str;
         frontmatter += "\n";
@@ -55,11 +55,11 @@ mod tests {
 
             let projects = vec![
                 ProjectChange {
-                    project_name: "frontend".to_string(),
+                    project_id: ProjectId::new("frontend")?,
                     version_bump: "minor".to_string(),
                 },
                 ProjectChange {
-                    project_name: "backend".to_string(),
+                    project_id: ProjectId::new("backend")?,
                     version_bump: "patch".to_string(),
                 },
             ];
@@ -88,11 +88,11 @@ mod tests {
 
             let projects = vec![
                 ProjectChange {
-                    project_name: "frontend".to_string(),
+                    project_id: ProjectId::new("frontend")?,
                     version_bump: "minor".to_string(),
                 },
                 ProjectChange {
-                    project_name: "backend".to_string(),
+                    project_id: ProjectId::new("backend")?,
                     version_bump: "patch".to_string(),
                 },
             ];
@@ -125,7 +125,7 @@ mod tests {
         fn test_project_frontmatter_formatting() -> Result<()> {
             let projects = vec![
                 ProjectChange {
-                    project_name: "api_client".to_string(),
+                    project_id: ProjectId::new("api_client")?,
                     version_bump: "major".to_string(),
                 }
             ];

@@ -1,7 +1,7 @@
 use std::env;
 
 use anyhow::{Context, Result};
-use monorelease::{MonoRelease, changes::ProjectChange, config::Config, logging::Log};
+use monorelease::{MonoRelease, ProjectId, changes::ProjectChange, config::Config, logging::Log};
 
 #[derive(clap::Parser, Debug, Clone)]
 pub struct Args {
@@ -53,27 +53,19 @@ pub enum WaveCommand {
 
 const CHANGE_PROJECT_INPUT_DELIMITER: &str = ":";
 fn parse_change_project_input(s: &str) -> Result<ProjectChange> {
-    let (project_name, version_bump) = s
+    let (project_id, version_bump) = s
         .split_once(CHANGE_PROJECT_INPUT_DELIMITER)
         .with_context(|| format!("does not contain '{CHANGE_PROJECT_INPUT_DELIMITER}'"))?;
 
     Ok(ProjectChange {
-        project_name: project_name.to_string(),
+        project_id: ProjectId::new(project_id)?,
         version_bump: version_bump.to_string(),
     })
 }
 
 #[derive(clap::Subcommand, Debug, Clone, PartialEq, Eq)]
 pub enum ProjectCommand {
-    Bump {
-        project: String,
-
-        /// Performs a dry-run.
-        #[arg(long)]
-        dry: bool,
-    },
-    /// Revert the last bump of a project.
-    Revert { project: String },
+    Bump { project: ProjectId },
 }
 
 pub type Wave = u32;
@@ -151,8 +143,7 @@ impl Cli {
                 }
             },
             Command::Projects { command } => match command {
-                ProjectCommand::Bump { project, dry } => todo!(),
-                ProjectCommand::Revert { project } => todo!(),
+                ProjectCommand::Bump { project } => todo!(),
             },
             Command::Changelogs { command } => match command {
                 ChangelogCommand::Exact { project, version } => todo!(),

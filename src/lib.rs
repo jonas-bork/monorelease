@@ -6,9 +6,12 @@ pub mod changes;
 pub mod config;
 pub mod init;
 pub mod logging;
+pub mod projects;
 #[cfg(test)]
 pub(crate) mod testing;
 pub mod waves;
+
+pub use projects::ProjectId;
 
 #[derive(Debug, Clone)]
 pub struct MonoRelease {
